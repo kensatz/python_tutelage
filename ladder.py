@@ -1,9 +1,18 @@
 import requests
 from collections import Counter
+import numpy
+import scipy
+import pandas
+import matplotlib
+#import pygraphviz  -- failed to install.  Says MSVC++ 14.0 is required;  I have 19.0 
+import pydot       #-- no runtime error, but intellisense says: "Unable to import 'pydot' "
+#import pyyaml      -- seems to have installed, but runtime error "No module named 'pyyaml' " occurs 
+#import gdal        -- failed to install.  Says MSVC++ 14.0 is required;  I have 19.0 
+import networkx
 
 def show_stats(legal_words, matches):
     tally = Counter()
-    for match_str, words in matches.items():
+    for _, words in matches.items():
         tally[len(words)] += 1
 
     max_length = max(tally.keys())
