@@ -1,28 +1,30 @@
 import requests
 from collections import Counter
-import numpy
-import scipy
-import pandas
-import matplotlib
+from collections import defaultdict
+from itertools import combinations
+
+#import sys
+#import numpy
+#import scipy
+#import pandas
+#import matplotlib
 #import pygraphviz  -- failed to install.  Says MSVC++ 14.0 is required;  I have 19.0 
-import pydot       #-- no runtime error, but intellisense says: "Unable to import 'pydot' "
+#import pydot       #-- no runtime error, but intellisense says: "Unable to import 'pydot' "
 #import pyyaml      -- seems to have installed, but runtime error "No module named 'pyyaml' " occurs 
 #import gdal        -- failed to install.  Says MSVC++ 14.0 is required;  I have 19.0 
-import networkx
+#import networkx as nx
 
-def show_stats(legal_words, matches):
-    tally = Counter()
-    for _, words in matches.items():
-        tally[len(words)] += 1
-
+def show_stats():
+    tally = Counter(map(len, matches.values()))
     max_length = max(tally.keys())
-    print(f'Frequency of number of words matching a given match string:')
-    print(f"{'n_words':>10s}{'frequency':>10s}")
-    for n_words in range(1,max_length+1):
-        print(f'{n_words:10}{tally[n_words]:10}')
-    print()
-    print(f'Longest match(es):\n')
+  
+    match_count = 0
+    for n_words in sorted(tally):
+        print(f'{tally[n_words]:10} match groups contain {n_words:3} word{"s" if n_words != 1 else ""}')
+        match_count += tally[n_words]
+    print(f'{match_count:10} match groups in total\n')
 
+    print(f'Longest match(es):\n')
     long_matches = [match_str for match_str, words in matches.items() if len(words) == max_length]
     for match in long_matches:
         print(f"   match string = '{match}'")
@@ -32,16 +34,38 @@ def show_stats(legal_words, matches):
             i += 1
         print()
 
+    tally = Counter(map(len, neighbors.values()))
+    tally[0] = sum(map(lambda word:len(neighbors[word]) == 0, words))
+    max_neighbors = max(tally.keys())
+
+    neighbor_count = 0
+    for n_neighbors in range(max_neighbors+1):
+        print(f'{tally[n_neighbors]:10} words have {n_neighbors:3} neighbor{"s" if n_neighbors != 1 else ""}')
+        neighbor_count += tally[n_neighbors]
+    print(f'{neighbor_count:10} words in total\n')
+
+    print(f'Largest group(s) of neighbors:\n')
+    large_circles = [word for word, neighbors in neighbors.items() if len(neighbors) == max_neighbors]
+    for word in large_circles:
+        print(f"   word = '{word}'")
+        i = 1
+        for neighbor in sorted(neighbors[word]):
+            print(f"       neighbor {i:2} =  '{neighbor}'")
+            i += 1
+        print()
+
+    
     for ms in matches.keys():
         if len(matches[ms]) == 4 and ms[0] != '*' and ms[-1] != '*':
             break
     print(f"matches[{ms}] = {matches[ms]}")
     print()
 
-    print(f"neighbors['maple'] = {neighbors['maple']}")
-    print(f"neighbors['apple'] = {neighbors['maple']}")
+    for word in ['maple', 'apple', 'alpha', 'omega', 'forte', 'piano', 'marge', 'merse', 'chine']:
+        print(f'neighbors["{word}"] = {neighbors[word]}')
     print()
-    
+
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     
 def legal(word):
     result = True  # initial assumption
@@ -49,7 +73,7 @@ def legal(word):
         result = False
     elif word[-1] == 's':
         result = False
-    elif word in ['chine', 'marge', 'merse', 'sedge', 'serge']:
+    elif word in ['chine', 'merse', 'sedge', 'serge', 'marge']:
         result = False
     return result
 
@@ -86,14 +110,13 @@ def solve(start, end):
     start_distance = {start: distance}
     end_distance = {end: distance}
     
-    ladder, nexus = None, None  # default
+    ladder, nexus = [], None  # default
     try:
         while True:
             start_list = [w for w, d in start_distance.items() if d == distance]
-            end_list = [w for w, d in end_distance.items() if d == distance]
-            if start_list == [] and end_list == []:
+            if start_list == []:
                 break
-            
+
             for word in start_list:
                 for w in neighbors[word]:
                     if w not in start_distance:
@@ -101,6 +124,10 @@ def solve(start, end):
                     if w in end_distance:
                         raise StopIteration
 
+            end_list = [w for w, d in end_distance.items() if d == distance]
+            if end_list == []:
+                break
+            
             for word in end_list:
                 for w in neighbors[word]:
                     if w not in end_distance:
@@ -117,40 +144,41 @@ def solve(start, end):
     finally:
         return ladder, nexus
 
-legal_words = []
+words = {}
+neighbors = defaultdict(set)
+matches = defaultdict(list)
 def init():
-    global legal_words, neighbors
+    global words, matches, neighbors
 
     response = requests.get("https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt")
     assert response.status_code == 200
-    words = response.text.split('\n')
-    del words[-1]
-    words.append('biden')
+    word_list = response.text.split('\n')
+    del word_list[-1]
+    word_list.append('biden')
+    words = set(filter(legal, word_list))
+    
+    for word in words:
+        for pattern in [word[:i] + '*' + word[i+1:] for i in range(5)]:
+            matches[pattern].append(word)
 
-    matches = {}
-    legal_words = list(filter(legal, words))
-    for word in legal_words:
-        for i in range(5):
-            pattern = word[:i] + '*' + word[i+1:]
-            if pattern in matches:
-                matches[pattern].append(word)
-            else:
-                matches[pattern] = [word]
+    for matching_words in matches.values():
+        for this_word, that_word in combinations(matching_words, 2):
+            neighbors[this_word].add(that_word) 
+            neighbors[that_word].add(this_word) 
 
-    non_trivial_matches = { match: words for match, words in matches.items() if len(words) > 1 }
-    neighbors = {word:set() for word in legal_words}
-    for pattern, words in non_trivial_matches.items():
-        L = len(words)
-        for i in range(L-1): 
-            for j in range(i+1, L):
-                word1, word2 = words[i], words[j]
-                neighbors[word1].add(word2) 
-                neighbors[word2].add(word1) 
-
-    show_stats(legal_words, matches)
-
+    print()
+    print(f'number of original words = {len(word_list):6}')
+    print(f'number of legal words    = {len(words)    :6}')
+    print(f'number of match groups   = {len(matches)  :6}')
+    print()
+    
+    # show_stats()
 
 def main():
+
+#    print(f'Testing NetworkX...')
+#    nx.test()
+
     init()
 
     test_cases = [
@@ -166,6 +194,7 @@ def main():
         ('forte', 'piano'),
         ('salty', 'peppy'),
         ('sleep', 'never'),
+        ('bathe', 'amigo'),
     ]
 
     for case in test_cases:
@@ -173,10 +202,10 @@ def main():
         ladder, nexus = solve(start, end)
         
         print(f'From {start} to {end} ')
-        if start not in legal_words:
-            print(f'{start} is not in the legal word list')
-        if end not in legal_words:
-            print(f'{end} is not in the legal word list')
+        if start not in words:
+            print(f' <{start} is not in the legal word list>')
+        if end not in words:
+            print(f' <{end} is not in the legal word list>')
  
         if ladder:
             step = 1
@@ -184,10 +213,20 @@ def main():
                 print(f'{step:4}  {word}  {"(nexus)" if word == nexus else ""}')
                 step += 1
         else:
-            print('No ladder found.')
+            print(' <no ladder found>')
 
         print()
+
 
 if __name__ == "__main__":
     main()
 
+def longest_ladder():
+    word_list = list(words)
+    longest_ladder = []
+    for i, start in enumerate(word_list[0:-1]):
+        for end in word_list[i+1:]:
+            ladder, nexus = solve(start, end)
+            if len(ladder) > len(longest_ladder):
+                longest_ladder = ladder
+    return longest_ladder, nexus
