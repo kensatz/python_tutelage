@@ -25,6 +25,7 @@ def main():
     init()
 
     test_cases = [
+        ('peace', 'plate'),
         ('large', 'small'),
         ('chick', 'hatch'),
         ('apple', 'maple'),
@@ -44,20 +45,12 @@ def main():
         start, end = case
         ladder, nexus = solve(start, end)
         
-        print(f'From {start} to {end} ')
-        if start not in words:
-            print(f' <{start} is not in the legal word list>')
-        if end not in words:
-            print(f' <{end} is not in the legal word list>')
- 
-        if ladder:
-            step = 1
-            for word in ladder:
-                print(f'{step:4}  {word}  {"(nexus)" if word == nexus else ""}')
-                step += 1
-        else:
+        print(f'From {start} to {end}:')
+        if not ladder:
             print(' <no ladder found>')
-
+        else:
+            for i, word in enumerate(ladder):
+                print(f'{i+1:4}  {word}  {"(nexus)" if word == nexus else ""}')
         print()
 
 def init():
@@ -82,72 +75,59 @@ def init():
     show_stats()
 
 def solve(start, end):
-    distance = 0
-    start_distance = {start: distance}
-    end_distance = {end: distance}
     
-    ladder, nexus = [], None  # default
-    try:
-        while True:
-            start_list = [w for w, d in start_distance.items() if d == distance]
-            if start_list == []:
-                break
+    def grow(in_words, this_word, that_word):
+        out_words = set()
 
-            for word in start_list:
-                for w in neighbors[word]:
-                    if w not in start_distance:
-                        start_distance[w] = distance + 1
-                    if w in end_distance:
-                        raise StopIteration
+        for word in in_words:
+            for neighbor in neighbors[word]:
+                if not this_word[neighbor]:
+                    this_word[neighbor] = word
+                    out_words.add(neighbor)
+                if that_word[neighbor]:
+                    return neighbor, out_words  # nexus found
+        return None, out_words  # nexus not found
 
-            end_list = [w for w, d in end_distance.items() if d == distance]
-            if end_list == []:
-                break
+    def pre(word):
+        while word:
+            word = prev_word[word]
+            if word:
+                yield word
+
+    def suf(word):
+        while word:
+            word = next_word[word]
+            if word:
+                yield word
+
+    def prefix(word):
+        l = [w for w in pre(word)]
+        l.reverse()
+        return l
+
+    def suffix(word):
+        return [w for w in suf(word)]
+    
+    def assemble_ladder():
+        return prefix(nexus) + [nexus] + suffix(nexus) if nexus else None
+
+    # solve() starts here
+    fwd_words, bwd_words = {start}, {end}
+    next_word, prev_word = defaultdict(str), defaultdict(str)
+
+    fwd = True      # arbitrary initial direction forward
+    while fwd_words and bwd_words:
+        if fwd:
+            nexus, fwd_words = grow(fwd_words, prev_word, next_word)
+        else:
+            nexus, bwd_words = grow(bwd_words, next_word, prev_word)
+        if nexus:
+            break
+        fwd = not fwd  # go the other way
+
+    prev_word[start], next_word[end] = None, None
+    return assemble_ladder(), nexus
             
-            for word in end_list:
-                for w in neighbors[word]:
-                    if w not in end_distance:
-                        end_distance[w] = distance + 1
-                    if w in start_distance:
-                        raise StopIteration
-            
-            distance += 1
-
-    except StopIteration:
-        nexus = w
-        ladder = assemble_ladder(start, nexus, end, start_distance, end_distance)
-
-    finally:
-        return ladder, nexus
-
-def assemble_ladder(start, nexus, end, start_dist, end_dist):
-    ladder = [nexus]
-    word = nexus
-    dist = start_dist[nexus]
-    while (dist):
-        for neighbor in neighbors[word]:
-            if neighbor in start_dist:
-                sd = start_dist[neighbor]
-                if sd == dist - 1:
-                    ladder = [neighbor] + ladder
-                    word, dist = neighbor, sd
-                    break
-        assert dist == sd
-
-    word = nexus
-    dist = end_dist[nexus]
-    while (dist):
-        for neighbor in neighbors[word]:
-            if neighbor in end_dist:
-                ed = end_dist[neighbor]
-                if ed == dist - 1:
-                    ladder = ladder + [neighbor]  # ladder += [neighbor]
-                    word, dist = neighbor, ed
-                    break
-        assert dist == ed
-
-    return ladder
-
 def legal(word):
     result = True  # initial assumption
     if len(word) != 5:
@@ -160,7 +140,6 @@ def legal(word):
 
 def show_stats():
     print()
-    # print(f'number of original words = {len(word_list):6}')
     print(f'number of legal words    = {len(words)    :6}')
     print(f'number of match groups   = {len(matches)  :6}')
     print()
@@ -222,7 +201,7 @@ def longest_ladder():
     longest_ladder = []
     for i, start in enumerate(word_list[0:-1]):
         for end in word_list[i+1:]:
-            ladder, nexus = solve(start, end)
+            nexus, ladder = solve(start, end)
             if len(ladder) > len(longest_ladder):
                 longest_ladder = ladder
     return longest_ladder, nexus
