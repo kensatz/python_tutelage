@@ -78,7 +78,6 @@ def solve(start, end):
     
     def grow(in_words, this_word, that_word):
         out_words = set()
-
         for word in in_words:
             for neighbor in neighbors[word]:
                 if not this_word[neighbor]:
@@ -88,27 +87,23 @@ def solve(start, end):
                     return neighbor, out_words  # nexus found
         return None, out_words  # nexus not found
 
-    def pre(word):
-        while word:
-            word = prev_word[word]
-            if word:
-                yield word
-
-    def suf(word):
-        while word:
-            word = next_word[word]
-            if word:
-                yield word
-
-    def prefix(word):
-        l = [w for w in pre(word)]
-        l.reverse()
-        return l
-
-    def suffix(word):
-        return [w for w in suf(word)]
-    
     def assemble_ladder():
+        def prefix(word):
+            def pre(word):
+                while word:
+                    word = prev_word[word]
+                    if word:
+                        yield word
+            l = [w for w in pre(word)]
+            l.reverse()
+            return l
+        def suffix(word):
+            def suf(word):
+                while word:
+                    word = next_word[word]
+                    if word:
+                        yield word
+            return [w for w in suf(word)]
         return prefix(nexus) + [nexus] + suffix(nexus) if nexus else None
 
     # solve() starts here
