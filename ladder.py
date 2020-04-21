@@ -72,7 +72,7 @@ def init():
             neighbors[this_word].add(that_word) 
             neighbors[that_word].add(this_word) 
 
-    show_stats()
+    # show_stats()
 
 def solve(start, end):
     
