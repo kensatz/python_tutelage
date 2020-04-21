@@ -15,7 +15,7 @@ from itertools import combinations
 #import networkx as nx
 
 words = {}
-matches = defaultdict(list)
+matches = defaultdict(set)
 neighbors = defaultdict(set)
 
 def main():
@@ -65,7 +65,7 @@ def init():
     
     for word in words:
         for pattern in [word[:i] + '*' + word[i+1:] for i in range(5)]:
-            matches[pattern].append(word)
+            matches[pattern].add(word)
 
     for matching_words in matches.values():
         for this_word, that_word in combinations(matching_words, 2):
@@ -94,9 +94,7 @@ def solve(start, end):
                     word = prev_word[word]
                     if word:
                         yield word
-            l = [w for w in pre(word)]
-            l.reverse()
-            return l
+            return [w for w in pre(word)][::-1]
         def suffix(word):
             def suf(word):
                 while word:
@@ -203,4 +201,3 @@ def longest_ladder():
 
 if __name__ == "__main__":
     main()
-
