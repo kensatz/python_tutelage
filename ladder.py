@@ -12,7 +12,7 @@ from itertools import combinations
 #import pydot       #-- no runtime error, but intellisense says: "Unable to import 'pydot' "
 #import pyyaml      -- seems to have installed, but runtime error "No module named 'pyyaml' " occurs 
 #import gdal        -- failed to install.  Says MSVC++ 14.0 is required;  I have 19.0 
-#import networkx as nx
+import networkx as nx
 
 words = {}
 matches = defaultdict(set)
@@ -199,5 +199,17 @@ def longest_ladder():
                 longest_ladder = ladder
     return longest_ladder, nexus
 
+def new_main():
+    init()
+
+    G = nx.Graph()
+    G.add_nodes_from(words)
+    for word in words:
+        for other_word in neighbors[word]:
+            G.add_edge(word, other_word)
+    result = nx.shortest_path(G, 'bathe', 'amigo')
+    print(result)
+    
 if __name__ == "__main__":
-    main()
+    new_main()
+
