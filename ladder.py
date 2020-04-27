@@ -1,4 +1,5 @@
 import requests
+import pickle
 from collections import Counter
 from collections import defaultdict
 from itertools import combinations
@@ -14,52 +15,68 @@ from itertools import combinations
 #import gdal        -- failed to install.  Says MSVC++ 14.0 is required;  I have 19.0 
 import networkx as nx
 
+# globals
 words = {}
 matches = defaultdict(set)
 neighbors = defaultdict(set)
 
 def main():
-#    print(f'Testing NetworkX...')
-#    nx.test()
-
     init()
 
     test_cases = [
+        ('loner', 'loner'),
         ('peace', 'plate'),
         ('large', 'small'),
         ('chick', 'hatch'),
         ('apple', 'maple'),
         ('homer', 'marge'),
-        ('alone', 'adobe'),
         ('alone', 'humph'),
         ('trump', 'biden'),
         ('alpha', 'omega'),
         ('fruit', 'punch'),
         ('forte', 'piano'),
         ('salty', 'peppy'),
+        ('crown', 'royal'),
         ('sleep', 'never'),
         ('bathe', 'amigo'),
     ]
 
     for case in test_cases:
         start, end = case
-        ladder, nexus = solve(start, end)
-        
         print(f'From {start} to {end}:')
+        if start not in words:
+            print(f"'{start}' is not a legal word'")
+        if end not in words:
+            print(f"'{end} is not a legal word")
+        ladder = solve(start, end)
+
         if not ladder:
-            print(' <no ladder found>')
+            print(' --- no ladder found ---')
         else:
-            for i, word in enumerate(ladder):
-                print(f'{i+1:4}  {word}  {"(nexus)" if word == nexus else ""}')
+            step = 1
+            for word in ladder:
+                print(f'{step:4}  {word}')
+                step += 1
         print()
 
 def init():
     global words, matches, neighbors
 
-    response = requests.get("https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt")
-    assert response.status_code == 200
-    word_list = response.text.split('\n')
-    del word_list[-1]
+    filename = 'common_words_5_letter.txt'
+    try:
+        with open(filename, 'rb') as in_file:
+            word_list = pickle.load(in_file)
+            print(f'Successfully read {len(word_list)} words from {filename}')
+    except FileNotFoundError:
+        response = requests.get("https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt")
+        assert response.status_code == 200
+        word_list = response.text.split('\n')
+        del word_list[-1] # omit trailing empty line 
+
+        with open(filename, 'wb') as out_file:
+            pickle.dump(word_list, out_file)
+            print(f'Successfully wrote {len(word_list)} words to {filename}')
+
     word_list.append('biden')
     words = set(filter(legal, word_list))
     
@@ -75,51 +92,66 @@ def init():
     # show_stats()
 
 def solve(start, end):
-    
-    def grow(in_words, this_word, that_word):
-        out_words = set()
-        for word in in_words:
+    def search():
+        nonlocal fwd, fwd_words, bwd_words, prev_word, next_word, nexus
+        nexus = None
+        next_wave = set()
+        for word in fwd_words:
             for neighbor in neighbors[word]:
-                if not this_word[neighbor]:
-                    this_word[neighbor] = word
-                    out_words.add(neighbor)
-                if that_word[neighbor]:
-                    return neighbor, out_words  # nexus found
-        return None, out_words  # nexus not found
+                if not prev_word[neighbor]:
+                    prev_word[neighbor] = word
+                    next_wave.add(neighbor)
+                if next_word[neighbor]:
+                    nexus = neighbor
+                    return
+        fwd_words = next_wave        
 
     def assemble_ladder():
-        def prefix(word):
-            def pre(word):
-                while word:
-                    word = prev_word[word]
-                    if word:
-                        yield word
-            return [w for w in pre(word)][::-1]
         def suffix(word):
             def suf(word):
-                while word:
+                while word != next_word[word]:
                     word = next_word[word]
-                    if word:
-                        yield word
+                    yield word
             return [w for w in suf(word)]
-        return prefix(nexus) + [nexus] + suffix(nexus) if nexus else None
 
-    # solve() starts here
+        def prefix(word):
+            def pre(word):
+                while word != prev_word[word]:
+                    word = prev_word[word]
+                    yield word
+            return [w for w in pre(word)][::-1]
+
+        return prefix(nexus) + [nexus] + suffix(nexus) if nexus else []
+
+    def reverse():
+        nonlocal fwd, fwd_words, bwd_words, prev_word, next_word 
+        fwd = not fwd 
+        fwd_words, bwd_words = bwd_words, fwd_words
+        prev_word, next_word = next_word, prev_word
+
+    #
+    # solve(start, end) 
+    #
     fwd_words, bwd_words = {start}, {end}
-    next_word, prev_word = defaultdict(str), defaultdict(str)
+    prev_word, next_word = defaultdict(str), defaultdict(str)
+    prev_word[start] = start    # pointer to self marks end-of-list
+    next_word[end]   = end      # ditto 
 
-    fwd = True      # arbitrary initial direction forward
-    while fwd_words and bwd_words:
-        if fwd:
-            nexus, fwd_words = grow(fwd_words, prev_word, next_word)
-        else:
-            nexus, bwd_words = grow(bwd_words, next_word, prev_word)
-        if nexus:
-            break
-        fwd = not fwd  # go the other way
+    fwd = True      # we arbitrarily choose forward as the initial direction 
+    nexus = None    # if we can find a nexus, we can build the shortest ladder 
+ 
+    # alternately search forward from start and backward from end
+    while not nexus and fwd_words and bwd_words:
+        search()
+        reverse()
 
-    prev_word[start], next_word[end] = None, None
-    return assemble_ladder(), nexus
+    # normalize direction
+    if not fwd:
+        reverse()
+
+    # return results
+    ladder = assemble_ladder()
+    return ladder
             
 def legal(word):
     result = True  # initial assumption
@@ -127,7 +159,7 @@ def legal(word):
         result = False
     elif word[-1] == 's':
         result = False
-    elif word in ['chine', 'merse', 'sedge', 'serge', 'marge']:
+    elif word in ['chine', 'merse', 'sedge', 'serge']:
         result = False
     return result
 
@@ -176,7 +208,6 @@ def show_stats():
             i += 1
         print()
 
-    
     for ms in matches.keys():
         if len(matches[ms]) == 4 and ms[0] != '*' and ms[-1] != '*':
             break
@@ -199,7 +230,7 @@ def longest_ladder():
                 longest_ladder = ladder
     return longest_ladder, nexus
 
-def new_main():
+def nx_main():
     init()
 
     G = nx.Graph()
@@ -207,9 +238,14 @@ def new_main():
     for word in words:
         for other_word in neighbors[word]:
             G.add_edge(word, other_word)
-    result = nx.shortest_path(G, 'bathe', 'amigo')
-    print(result)
+
+    start, end = 'bathe', 'amigo'
+    print(f'From {start} to {end}:')
+    for i, word in enumerate(nx.shortest_path(G, start, end)):
+        print(f'{i+1:5}   {word}')
+    print()
     
 if __name__ == "__main__":
-    new_main()
+    # nx_main()
+    main()
 
