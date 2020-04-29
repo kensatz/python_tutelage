@@ -1,10 +1,8 @@
-import sys
+import sys, os
 import string
+from argparse import ArgumentParser
 
 def main():
-    def usage(prog_name):
-        print(f'usage: {prog_name} <file_name>')
-        sys.exit(-1)
 
     printable_chars = string.ascii_letters + string.digits + string.punctuation
     def char_of(byte):
@@ -13,18 +11,20 @@ def main():
             s = '.'
         return s
 
-    prog_name = sys.argv[0]
-    args = sys.argv[1:]
+    parser = ArgumentParser()
+    parser.add_argument("-n", type=int, help="display n bytes")  # optional
+    parser.add_argument("filename", help="file to dump")         # required
 
-    if len(args) != 1:
-        usage(prog_name)
-    filename = args[0]
-    print(f'opening {filename}')
+    args = parser.parse_args()
+    filename = args.filename
+    n = args.n or os.stat(filename).st_size
 
     address = 0
     with open(filename, 'rb') as infile:
         while True:
-            byte_line = infile.read(16)
+            byte_line = infile.read(min(n,16))
+            n -= len(byte_line)
+
             if not byte_line:
                 break
 
