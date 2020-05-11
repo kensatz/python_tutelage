@@ -50,3 +50,8 @@ def main():
        
 if __name__ == "__main__":
     main()
+
+def read_byte_line(file, start_address):
+    pass
+
+    
