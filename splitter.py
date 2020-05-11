@@ -85,33 +85,33 @@ def parse_file_header(multifile, specs):
     bits_per_sample = int.from_bytes(multifile.read(2), byteorder = 'little')
     specs['bits_per_sample'] = bits_per_sample
 
-    # The wave file from the X32 appears to be non-compliant at this point. 
-    # A 'JUNK' chunk follows which we will ignore.  
-    # The JUNK chunk's format is unknown, but its size is known. 
-    # Based on the size, it appears that JUNK includes the audio data. 
-    # So we can't just ignore the JUNK chunk. 
-    # We must scan through it looking for the subchunk ID 'data'. 
-    # Fortunately, it appears that all ID's are aligned on 4-byte boundaires. 
-
+    # skip past any unused subchunks
     while True:
-        data_subchunk_id = multifile.read(4)
-        if data_subchunk_id == b'data':
+        subchunk_id = multifile.read(4)
+        subchunk_size = int.from_bytes(multifile.read(4), byteorder = 'little')    
+        if subchunk_id == b'data':
             break
-    specs['data_subchunk_id'] = data_subchunk_id
+        print(f"skipping past subchunk '{subchunk_id}' ({subchunk_size} bytes)")
+        multifile.read(subchunk_size)
 
-    data_subchunk_size = int.from_bytes(multifile.read(4), byteorder = 'little')
+    data_subchunk_id = subchunk_id
+    data_subchunk_size = subchunk_size
+    
+    specs['data_subchunk_id'] = data_subchunk_id
     specs['data_subchunk_size'] = data_subchunk_size
 
-    num_frames = specs['data_subchunk_size']//specs['block_align']
+    num_frames = data_subchunk_size // block_align
     print(f'number of frames (calculated) = {num_frames:10,}')
     specs['num_frames'] = num_frames
 
-    total = num_frames // specs['sample_rate']
-    seconds = total % 60
-    total //= 60
-    minutes = total % 60
-    total //= 60
-    hours = total
+    assert num_frames * block_align == data_subchunk_size
+    
+    dt = num_frames // specs['sample_rate']
+    seconds = dt % 60
+    dt //= 60
+    minutes = dt % 60
+    dt //= 60
+    hours = dt
     duration = f'{hours:2d}:{minutes:02d}:{seconds:02d}'
     specs['duration'] = duration
 
@@ -134,13 +134,18 @@ def split(multifile, specs):
         write_header(outfile, specs)
         outfiles[i] = outfile
     
+    # hi_peaks = [0] * num_channels
+    # lo_peaks = [0] * num_channels
     n_frames = 0
     bytes_per_sample =specs['bits_per_sample'] // 8
     while True:
-        for outfile in outfiles:
+        for i, outfile in enumerate(outfiles):
             sample = multifile.read(bytes_per_sample)
             if len(sample)!= bytes_per_sample:
                 break
+            x = int.from_bytes(sample, 'little', signed = True)
+            # hi_peaks[i] = max(hi_peaks[i], x)
+            # lo_peaks[i] = min(lo_peaks[i], x)
             outfile.write(sample)
         if len(sample) != bytes_per_sample:
             break
@@ -148,7 +153,13 @@ def split(multifile, specs):
             print(f'n_frames = {n_frames:,}')
         n_frames += 1
 
-    print(f'number of frames (counted)    = {n_frames:10,}') 
+    # print(f'{"channel":>16}{"hi peaks":>16}{"lo peaks":>16}')
+    # for i in range(num_channels):
+    #     print(f'{i+1:16}{hi_peaks[i]:16,}{lo_peaks[i]:16,}')
+    # print()
+
+    print(f"number of frames (expected)   = {specs['num_frames']:15,}")
+    print(f"number of frames (counted)    = {n_frames:15,}") 
 
     for outfile in outfiles:
         outfile.close()
@@ -166,11 +177,11 @@ def write_header(outfile, specs):
     fmt_subchunk_size   = specs['fmt_subchunk_size'].to_bytes(4, 'little')  # 16 (as 4 bytes)
     audio_format        = specs['audio_format'].to_bytes(2, 'little')       # 1 (as 2 bytes)
     num_channels        = (1).to_bytes(2, 'little')
-    sample_rate         = specs['sample_rate'].to_bytes(4, 'little')        # 48,000 as 4 bytes
+    sample_rate         = specs['sample_rate'].to_bytes(4, 'little')        # typically 48,000 or 44,100
     byte_rate           = mono_byte_rate.to_bytes(4, 'little')
     block_align         = mono_block_align.to_bytes(2, 'little')
     bits_per_sample     = specs['bits_per_sample'].to_bytes(2, 'little')
-    data_subchunk_id    = specs['data_subchunk_id']        # b'data'
+    data_subchunk_id    = specs['data_subchunk_id']        # b'data'        # typically 16, 24, or 32
     data_subchunk_size  = mono_data_size.to_bytes(4, 'little')
 
     outfile.write(chunk_id)
