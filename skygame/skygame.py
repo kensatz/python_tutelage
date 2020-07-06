@@ -30,7 +30,7 @@ def worker(x):
     sleep(3)
     return x+5
 
-t = Thread(target=worker, args=[7])
+t = FunctionThread(target=worker, args=[7])
 t.start()
 
 print("do other stuff in main thread")
@@ -72,5 +72,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
