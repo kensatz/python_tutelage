@@ -1,74 +1,76 @@
 # 
 import requests
 import sys
-import msvcrt
 import time
 from time import sleep
 from threading import Thread
 
-class FunctionThread(Thread):
-    def __init__(self, *args, **kwargs):
-        self.saved_target = kwargs.get('target')
-        self.saved_args = kwargs.get('args')
-        self.saved_kwargs = kwargs.get('kwargs')
+class Clash:
+    def __init__(self, url):
+        self.url = url
 
-        super().__init__(*args, **kwargs)
-        self._return = None
+    def get(self, key):
+        response = requests.get(f'{self.url}/?{key}')
+        assert response.status_code == 200
+        return response.text
 
-    def run(self):
-        args = self.saved_args or []
-        kwargs = self.saved_kwargs or {}
-        if self.saved_target:
-            self._return = self.saved_target(*args, **kwargs)
-    
-    def join(self, *args, **kwargs):
-        super().join(*args, **kwargs)
-        return self._return
+    def put(self, key, val):
+        response = requests.get(f'{self.url}/?{key}={val}')
+        assert response.status_code == 200
 
-def worker(x):
-    print(f"I'm working on {x}")
-    sleep(3)
-    return x+5
+class ClashLobby:
+    def __init__(self, clash, lobby_key):
+        self.clash = clash
+        self.lobby_key = lobby_key
 
-t = FunctionThread(target=worker, args=[7])
-t.start()
+    def enter(self, name):
+        registered = False
+        while not registered:
+            print('+')
+            name_list = self.clash.get(self.lobby_key)
+            names = name_list.split(',')
+            if name in names:
+                registered = True
+            else:
+                names.append(name)
+                name_list = ','.join(names)
+                self.clash.put(self.lobby_key, name_list)
+                sleep(0.5)
 
-print("do other stuff in main thread")
+    def exit(self, name):
+        registered = True
+        while registered:
+            print('-')
+            name_list = self.clash.get(self.lobby_key)
+            names = name_list.split(',')
+            if name not in names:
+                registered = False
+            else:
+                names.remove(name)
+                name_list = ','.join(names)
+                self.clash.put(self.lobby_key, name_list)
+                sleep(0.5)
 
-ret = t.join()
-print(f"done: {ret}")
-sys.exit()
-
-def process_local():
-    return False
-
-def process_remote():
-    return False
-
-def get_game():
-    game_state = requests.get("http://key-value-pairs.appspot.com/?game_state")
-    assert game_state.status_code == 200
-    return game_state.text
-
-def put_game(state):
-    game_state = requests.get(f"http://key-value-pairs.appspot.com/?game_state={state}")
-    assert game_state.status_code == 200
-
+    def lobbyists(self):
+        return self.clash.get(self.lobby_key.split(','))
+        
 def main():
-    state = get_game()
-    if state == '':
-        greeting = input('Enter a greeting to host a game, or press enter to wait for a game to start.')
-        if greeting:
-            put_game(greeting)
+    clash = Clash("http://key-value-pairs.appspot.com")
+    lobby = ClashLobby(clash, "lobby")
 
-    while True:
-        if msvcrt.kbhit():
-            done = process_local()
-            if done:
-                break
-        state = get_game()
-        if state == '':
-            break
+    name = input("What's your name? ")
+    lobby.exit(name)
+    print(f"Lobby contains: {lobby.lobbyists()}")
+    input("press Enter to enter")
+    lobby.enter(name)
+    print("Your are registered!")
+    print(f"Lobby contains: {lobby.lobbyists()}")
+
+    #play(name)
+    #unregister(name)
+
+def get_name():
+    return input("Enter your name:")
 
 if __name__ == '__main__':
     main()
