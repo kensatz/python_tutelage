@@ -52,7 +52,7 @@ class ClashLobby:
                 sleep(0.5)
 
     def lobbyists(self):
-        return self.clash.get(self.lobby_key.split(','))
+        return self.clash.get(self.lobby_key).split(',')
         
 def main():
     clash = Clash("http://key-value-pairs.appspot.com")
@@ -61,16 +61,15 @@ def main():
     name = input("What's your name? ")
     lobby.exit(name)
     print(f"Lobby contains: {lobby.lobbyists()}")
-    input("press Enter to enter")
+
+    input("press Enter to enter the lobby")
     lobby.enter(name)
-    print("Your are registered!")
+    print("Your are now in the lobby")
     print(f"Lobby contains: {lobby.lobbyists()}")
 
     #play(name)
     #unregister(name)
 
-def get_name():
-    return input("Enter your name:")
 
 if __name__ == '__main__':
     main()
