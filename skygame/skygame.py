@@ -28,7 +28,7 @@ class ClashLobby:
         while not registered:
             print('+')
             name_list = self.clash.get(self.lobby_key)
-            names = name_list.split(',')
+            names = name_list.split(',') if name_list else []
             if name in names:
                 registered = True
             else:
@@ -42,7 +42,7 @@ class ClashLobby:
         while registered:
             print('-')
             name_list = self.clash.get(self.lobby_key)
-            names = name_list.split(',')
+            names = name_list.split(',') if name_list else []
             if name not in names:
                 registered = False
             else:
@@ -62,7 +62,7 @@ def main():
     lobby.exit(name)
     print(f"Lobby contains: {lobby.lobbyists()}")
 
-    input("press Enter to enter the lobby")
+    input("press Enter to enter the lobby ")
     lobby.enter(name)
     print("Your are now in the lobby")
     print(f"Lobby contains: {lobby.lobbyists()}")
