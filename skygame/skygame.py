@@ -180,10 +180,10 @@ class C4_player:
         return None
         
 def main():
-    clash = Clash("http://key-value-pairs.appspot.com")
-    lobby = ClashLobby(clash, "lobby")
+    # clash = Clash("http://key-value-pairs.appspot.com")
+    # lobby = ClashLobby(clash, "lobby")
 
-    my_name = input("What's your name? ")
+    # my_name = input("What's your name? ")
     # lobby.exit(my_name)
     # print(f"Lobby contains: {lobby.lobbyists()}")
 
@@ -192,6 +192,7 @@ def main():
     # print("Your are now in the lobby")
     # print(f"Lobby contains: {lobby.lobbyists()}")
 
+    my_name = input("What's your name? ")
     op_name = input("What is your opponent's name? ")
     op_ilk = input("What is your opponent's ilk (local or remote)? ")
     assert op_ilk in ('local', 'remote')
