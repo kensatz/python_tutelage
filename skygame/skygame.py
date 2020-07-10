@@ -93,43 +93,20 @@ class C4_game:
         #     '!'  (tie game)
         #     None (game incomplete)
                 
-        g = self.grid()
-
-        # check for horizontal win
-        for rank in range(6):
-            for left in range(4):
-                group = [g[left+i][rank] for i in range(4)]
-                if all([checker == 'X' for checker in group]):
-                    return 'X'
-                if all([checker == 'O' for checker in group]):
-                    return 'O'
-        
-        # check for vertical win
-        for column in range(7):
-            for bottom in range(3):
-                group = [g[column][bottom+i] for i in range(4)]
-                if all([checker == 'X' for checker in group]):
-                    return 'X'
-                if all([checker == 'O' for checker in group]):
-                    return 'O'
-
-        # check for primary diagonal win
-        for left in range(4):
-            for bottom in range(3):
-                group = [g[left+i][bottom+i] for i in range(4)]
-                if all([checker == 'X' for checker in group]):
-                    return 'X'
-                if all([checker == 'O' for checker in group]):
-                    return 'O'
-
-        # check for secondary diagonal win
-        for left in range(3, 7):
-            for bottom in range(3):
-                group = [g[left-i][bottom+i] for i in range(4)]
-                if all([checker == 'X' for checker in group]):
-                    return 'X'
-                if all([checker == 'O' for checker in group]):
-                    return 'O'
+        grid = self.grid()
+        # check for wins
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dc, dr in directions:
+            for column in range(7):
+                if column + 3*dc not in range(7):
+                    continue
+                for rank in range(6):
+                    if rank + 3*dr not in range(6):
+                        continue
+                    line = [grid[column + i*dc][rank + i*dr] for i in range(4)]
+                    for color in ('X', 'O'):
+                        if all([checker == color for checker in line]):
+                            return color
 
         # check for tie
         if self.ply == 6*7:
@@ -142,10 +119,10 @@ class C4_game:
         g = self.grid()
         print()
         print('    +---------------------+')
-        for rank in range(6, 0, -1):
+        for rank in range(5, -1, -1):
             print(f'    |', end = '')
             for column in range(7):
-                print(f' {g[column][rank-1]} ', end = '')
+                print(f' {g[column][rank]} ', end = '')
             print('|')
         print('    +---------------------+')
         print('      1  2  3  4  5  6  7 ')
