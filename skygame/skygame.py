@@ -68,16 +68,6 @@ class C4_game:
         self.board[column].append(checker)
         self.ply += 1
 
-    def winner(self):
-        # possible return values are:
-        #     'X'
-        #     'O'
-        #     '!'  (tie game)
-        #     None (game incomplete)
-
-        # TBD: add winner code 
-        return None
-
     def update_game_state(self):
         exes_turn = self.ply % 2 == 0
         current_player = self.playerX if exes_turn else self.playerO
@@ -96,11 +86,61 @@ class C4_game:
             g.append(c)
         return g
 
-    def display_board(self):
-        #print(repr(self))
+    def winner(self):
+        # possible return values are:
+        #     'X'
+        #     'O'
+        #     '!'  (tie game)
+        #     None (game incomplete)
+                
         g = self.grid()
-        print('\b')
-        #print(f'{"ply":>37} {self.ply:2}')
+
+        # check for horizontal win
+        for rank in range(6):
+            for left in range(4):
+                group = [g[left+i][rank] for i in range(4)]
+                if all([checker == 'X' for checker in group]):
+                    return 'X'
+                if all([checker == 'O' for checker in group]):
+                    return 'O'
+        
+        # check for vertical win
+        for column in range(7):
+            for bottom in range(3):
+                group = [g[column][bottom+i] for i in range(4)]
+                if all([checker == 'X' for checker in group]):
+                    return 'X'
+                if all([checker == 'O' for checker in group]):
+                    return 'O'
+
+        # check for primary diagonal win
+        for left in range(4):
+            for bottom in range(3):
+                group = [g[left+i][bottom+i] for i in range(4)]
+                if all([checker == 'X' for checker in group]):
+                    return 'X'
+                if all([checker == 'O' for checker in group]):
+                    return 'O'
+
+        # check for secondary diagonal win
+        for left in range(3, 7):
+            for bottom in range(3):
+                group = [g[left-i][bottom+i] for i in range(4)]
+                if all([checker == 'X' for checker in group]):
+                    return 'X'
+                if all([checker == 'O' for checker in group]):
+                    return 'O'
+
+        # check for tie
+        if self.ply == 6*7:
+            return '!'  # tie game
+        
+        # otherwise, game is incomplete
+        return None
+
+    def display_board(self):
+        g = self.grid()
+        print()
         print('    +---------------------+')
         for rank in range(6, 0, -1):
             print(f'    |', end = '')
@@ -164,16 +204,24 @@ def main():
         O = C4_player(my_name, 'O', 'local')
     game = C4_game(X, O)
 
+    game.display_board()
     winner = None
     while winner == None:
-        game.update_game_state()
         exes_turn = game.ply % 2 == 0
         current_player = X if exes_turn else O
         move = current_player.get_move()
         game.make_move(move)
+        game.update_game_state()
         winner = game.winner()
 
-    print(f'And the winner is... {game.winner()}')
+    winner = game.winner()
+    if winner in {'X', 'O'}:
+        print(f'{winner} wins the game.')
+    elif winner == '!':
+        print(f'Tie game!')
+    else:
+        print(f"something's wrong... game.winner() returned {winner}.")
+    print()
 
 
 if __name__ == '__main__':
