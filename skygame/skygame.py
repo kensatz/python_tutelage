@@ -53,6 +53,60 @@ class ClashLobby:
 
     def lobbyists(self):
         return self.clash.get(self.lobby_key).split(',')
+
+class C4_game:
+    def __init__(self, playerX, playerO):
+        self.playerX, self.playerO = playerX, playerO
+        self.ply = 0
+        self.board = [[] for _ in range(7)]
+
+    def make_move(self, column):
+        assert column in range(7)
+        assert len(self.board[column]) < 6
+        turn = self.ply % 2
+        checker = 'X' if turn == 0 else 'O'
+        self.board[column].append(checker)
+        self.ply += 1
+
+    def winner(self):
+        # possible return values are:
+        #     'X'
+        #     'O'
+        #     '!'  (tie game)
+        #     None (game incomplete)
+        pass
+
+    def update_game_state(self):
+        turn = self.ply % 2
+        current_player = self.playerX if turn == 0 else self.playerO
+        if current_player.ilk == 'local':
+            self.display_board()
+        pass # TBD: post game state to clash 
+
+    def display_board(self):
+        pass
+
+    def __str__(self):
+        pass
+
+class C4_player:
+    def __init__(self, name, color, ilk):
+        assert color in ('X', 'O')
+        assert ilk in ('local', 'remote')
+        self.name, self.color, self.ilk = name, color, ilk
+
+    def get_move(self):
+        return self.get_local_move() if self.ilk == 'local' else self.get_remote_move()
+
+    def get_local_move(self):
+        column = -1
+        while column not in range(7):
+            column = input('Place your checker in what column?')
+
+    def get_remote_move(self):
+        # wait for change in game state, determine move, and return it
+        pass
+
         
 def main():
     clash = Clash("http://key-value-pairs.appspot.com")
