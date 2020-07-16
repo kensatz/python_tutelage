@@ -130,6 +130,11 @@ class C4_game:
         for column in self.board:
             col_strs.append(f"[{','.join(map(repr, column))}]")
         return f"{self.ply}:[{','.join(col_strs)}]"
+
+    def unrepr(self, repr):
+        parts = repr.split(':')
+        self.ply = eval(parts[0])
+        self.board = eval(parts[1])
         
     def __str__(self):
         pass
