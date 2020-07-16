@@ -5,6 +5,7 @@ import time
 from time import sleep
 from threading import Thread
 
+#---------------------------------------------------------------
 class Clash:
     def __init__(self, url):
         self.url = url
@@ -18,6 +19,7 @@ class Clash:
         response = requests.get(f'{self.url}/?{key}={val}')
         assert response.status_code == 200
 
+#---------------------------------------------------------------
 class ClashLobby:
     def __init__(self, clash, lobby_key):
         self.clash = clash
@@ -54,18 +56,23 @@ class ClashLobby:
     def lobbyists(self):
         return self.clash.get(self.lobby_key).split(',')
 
+#---------------------------------------------------------------
 class C4_game:
     def __init__(self, playerX, playerO):
         self.playerX, self.playerO = playerX, playerO
+        self.board = [[' '] * 6 for _ in range(7)]
         self.ply = 0
-        self.board = [[] for _ in range(7)]
+
+    def get_checker(self, column, rank):
+        return self.board[column][rank] if column in range(7) and rank in range(6) else None
 
     def make_move(self, column):
         assert column in range(7)
-        assert len(self.board[column]) < 6
+        assert ' ' in self.board[column]
         exes_turn = self.ply % 2 == 0
         checker = 'X' if exes_turn else 'O'
-        self.board[column].append(checker)
+        rank = self.board[column].index(' ')
+        self.board[column][rank] = checker
         self.ply += 1
 
     def update_game_state(self):
@@ -75,66 +82,59 @@ class C4_game:
             self.display_board()
         pass # TBD: post game state to clash 
 
-    def grid(self):
-        g = []
-        for column in self.board:
-            c = []
-            for checker in column:
-                c.append(checker)
-            for _ in range(len(column), 7):
-                c.append(' ')
-            g.append(c)
-        return g
-
     def winner(self):
         # possible return values are:
         #     'X'
         #     'O'
-        #     '!'  (tie game)
+        #     '='  (tie game)
         #     None (game incomplete)
                 
-        grid = self.grid()
         # check for wins
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for dc, dr in directions:
-            for column in range(7):
-                if column + 3*dc not in range(7):
-                    continue
-                for rank in range(6):
-                    if rank + 3*dr not in range(6):
-                        continue
-                    line = [grid[column + i*dc][rank + i*dr] for i in range(4)]
+            for c0 in range(7):
+                for r0 in range(6):
+                    line = [self.get_checker(c0 + i*dc, r0 + i*dr) for i in range(4)]
                     for color in ('X', 'O'):
-                        if all([checker == color for checker in line]):
+                        if all(checker == color for checker in line):
                             return color
 
         # check for tie
         if self.ply == 6*7:
-            return '!'  # tie game
+            return '='  # tie game
         
         # otherwise, game is incomplete
         return None
 
     def display_board(self):
-        g = self.grid()
         print()
         print('    +---------------------+')
         for rank in range(5, -1, -1):
             print(f'    |', end = '')
             for column in range(7):
-                print(f' {g[column][rank]} ', end = '')
+                print(f' {self.get_checker(column, rank)} ', end = '')
             print('|')
         print('    +---------------------+')
         print('      1  2  3  4  5  6  7 ')
+        # repr = self.__repr__()
+        # print(f'repr = {repr}')
+        # parts = repr.split(':')
+        # ply = eval(parts[0])
+        # board = eval(parts[1])
+        # print(f'ply = {ply}')
+        # print(f'board = {board}')
         print()
-        
 
     def __repr__(self):
-        return '<'+str(self.ply)+',['+','.join(map(lambda x:''.join(x),self.board))+']>'
+        col_strs = []
+        for column in self.board:
+            col_strs.append(f"[{','.join(map(repr, column))}]")
+        return f"{self.ply}:[{','.join(col_strs)}]"
         
     def __str__(self):
         pass
 
+#---------------------------------------------------------------
 class C4_player:
     def __init__(self, name, color, ilk):
         assert color in ('X', 'O')
@@ -156,6 +156,7 @@ class C4_player:
         # wait for change in game state, determine move, and return it
         return None
         
+#---------------------------------------------------------------
 def main():
     # clash = Clash("http://key-value-pairs.appspot.com")
     # lobby = ClashLobby(clash, "lobby")
@@ -180,6 +181,7 @@ def main():
     else:
         X = C4_player(op_name, 'X', op_ilk)
         O = C4_player(my_name, 'O', 'local')
+
     game = C4_game(X, O)
 
     game.display_board()
@@ -202,5 +204,6 @@ def main():
     print()
 
 
+#---------------------------------------------------------------
 if __name__ == '__main__':
     main()
