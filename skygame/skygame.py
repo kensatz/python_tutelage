@@ -4,7 +4,7 @@ import sys
 import time
 from time import sleep
 from threading import Thread
-
+    
 #---------------------------------------------------------------
 class Clash:
     def __init__(self, url):
@@ -58,10 +58,13 @@ class ClashLobby:
 
 #---------------------------------------------------------------
 class C4_game:
-    def __init__(self, playerX, playerO):
-        self.playerX, self.playerO = playerX, playerO
+    def __init__(self, clash, playerX, playerO):
+        self.clash, self.playerX, self.playerO = clash, playerX, playerO
+        self.clash_key = f'C4_{playerX.name}_{playerO.name}'
         self.board = [[' '] * 6 for _ in range(7)]
         self.ply = 0
+        if playerX.ilk == 'local':
+            self.clash.put(self.clash_key, self.__repr__())
 
     def get_checker(self, column, rank):
         return self.board[column][rank] if column in range(7) and rank in range(6) else None
@@ -69,9 +72,10 @@ class C4_game:
     def make_move(self, column):
         assert column in range(7)
         assert ' ' in self.board[column]
+        rank = self.board[column].index(' ')
+
         exes_turn = self.ply % 2 == 0
         checker = 'X' if exes_turn else 'O'
-        rank = self.board[column].index(' ')
         self.board[column][rank] = checker
         self.ply += 1
 
@@ -80,7 +84,7 @@ class C4_game:
         current_player = self.playerX if exes_turn else self.playerO
         if current_player.ilk == 'local':
             self.display_board()
-        pass # TBD: post game state to clash 
+        self.clash.put(self.clash_key, self.__repr__())
 
     def winner(self):
         # possible return values are:
@@ -116,13 +120,6 @@ class C4_game:
             print('|')
         print('    +---------------------+')
         print('      1  2  3  4  5  6  7 ')
-        # repr = self.__repr__()
-        # print(f'repr = {repr}')
-        # parts = repr.split(':')
-        # ply = eval(parts[0])
-        # board = eval(parts[1])
-        # print(f'ply = {ply}')
-        # print(f'board = {board}')
         print()
 
     def __repr__(self):
@@ -131,20 +128,22 @@ class C4_game:
             col_strs.append(f"[{','.join(map(repr, column))}]")
         return f"{self.ply}:[{','.join(col_strs)}]"
 
-    def unrepr(self, repr):
+    def unpack(self, repr):
         parts = repr.split(':')
-        self.ply = eval(parts[0])
-        self.board = eval(parts[1])
+        asset len(parts) == 2
+        ply = eval(parts[0])
+        board = eval(parts[1])
+        return ply, board
         
     def __str__(self):
         pass
 
 #---------------------------------------------------------------
 class C4_player:
-    def __init__(self, name, color, ilk):
+    def __init__(self, clash, name, color, ilk):
         assert color in ('X', 'O')
         assert ilk in ('local', 'remote')
-        self.name, self.color, self.ilk = name, color, ilk
+        self.clash, self.name, self.color, self.ilk = clash, name, color, ilk
 
     def get_move(self):
         return self.get_local_move() if self.ilk == 'local' else self.get_remote_move()
@@ -157,13 +156,17 @@ class C4_player:
         return column
 
     def get_remote_move(self):
+        my_turn = False
+        while not my_turn:
+            repr = self.clash.get()
         # TBD: implement this
         # wait for change in game state, determine move, and return it
         return None
         
 #---------------------------------------------------------------
 def main():
-    # clash = Clash("http://key-value-pairs.appspot.com")
+    clash = Clash("http://key-value-pairs.appspot.com")
+
     # lobby = ClashLobby(clash, "lobby")
 
     # my_name = input("What's your name? ")
@@ -187,7 +190,7 @@ def main():
         X = C4_player(op_name, 'X', op_ilk)
         O = C4_player(my_name, 'O', 'local')
 
-    game = C4_game(X, O)
+    game = C4_game(clash, X, O)
 
     game.display_board()
     winner = None
