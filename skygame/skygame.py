@@ -136,6 +136,7 @@ class C4_player:
         assert ilk in ('local', 'remote')
         self.name, self.color, self.ilk = name, color, ilk 
         self.clash, self.game_name = clash, game_name 
+        print(f'name = {name}, color = {color}, ilk = {ilk}, game_name = {game_name}')
 
     def is_my_turn(self, ply):
         my_ply = 0 if self.color == 'X' else 1
@@ -165,7 +166,7 @@ class C4_player:
             sleep(0.5)
         comparisons = [board[i] == old_board[i] for i in range(7)]
         assert not all(comparisons)
-        return comparisons.index(False)
+        return comparisons.index(False) 
 
 #---------------------------------------------------------------
 def main():
