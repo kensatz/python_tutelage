@@ -131,13 +131,13 @@ class C4_game:
 
 #---------------------------------------------------------------
 class C4_player:
-    def __init__(self, name, color, ilk, clash, game_key):
+    def __init__(self, name, color, ilk, clash, game_name):
         assert color in ('X', 'O')
         assert ilk in ('local', 'remote')
         self.name, self.color, self.ilk = name, color, ilk 
-        self.clash, self.game_key = clash, game_key 
+        self.clash, self.game_name = clash, game_name 
 
-    def my_turn(self, ply):
+    def is_my_turn(self, ply):
         my_ply = 0 if self.color == 'X' else 1
         return my_ply == ply
 
@@ -159,14 +159,13 @@ class C4_player:
         return ply, board
 
     def get_remote_move(self, old_board):
-        ply, board = self.unpack(self.clash.get(self.game_key))
-        while not self.my_turn(ply):
-            ply, board = self.unpack(self.clash.get(self.game_key))
+        ply, board = self.unpack(self.clash.get(self.game_name))
+        while not self.is_my_turn(ply):
+            ply, board = self.unpack(self.clash.get(self.game_name))
             sleep(0.5)
         comparisons = [board[i] == old_board[i] for i in range(7)]
-        assert any(comparisons)
+        assert not all(comparisons)
         return comparisons.index(False)
-        #TBD ... determine move and return it
 
 #---------------------------------------------------------------
 def main():
