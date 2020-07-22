@@ -168,10 +168,7 @@ def main():
     winner = None
     while winner == None:
         game.display_board()
-        if game.my_turn():
-            move = game.get_local_move() 
-        else:
-            move = game.get_remote_move()
+        move = game.get_local_move() if game.my_turn() else game.get_remote_move()
         game.make_move(move)
         game.update_game_state()
         winner = game.winner()
@@ -179,6 +176,8 @@ def main():
     game.display_board()
     names = {'X':game.X_name, 'O':game.O_name, '=':'The cat'}
     print(f"{names[winner]} wins!")
+
+    # clash.put(game.game_name, '') # cleanup
 
 #---------------------------------------------------------------
 if __name__ == '__main__':
