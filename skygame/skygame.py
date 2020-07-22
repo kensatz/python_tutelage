@@ -57,10 +57,10 @@ class ClashLobby:
         return self.clash.get(self.lobby_key).split(',')
 
 #---------------------------------------------------------------
-class C4_game:
+class C4_game: 
     def __init__(self, clash, my_name, op_name, i_start):
         self.clash, self.my_name, self.op_name = clash, my_name, op_name 
-        
+
         self.my_phase = 0 if i_start else 1
         self.X_name = my_name if i_start else op_name
         self.O_name = op_name if i_start else my_name
@@ -83,6 +83,7 @@ class C4_game:
         ply = eval(parts[0])
         board = eval(parts[1])
         return ply, board
+
 
     def my_turn(self):
         return self.ply % 2 == self.my_phase
@@ -166,18 +167,17 @@ def main():
     game = C4_game(clash, my_name, op_name, i_start)
 
     winner = None
-    while winner == None:
+    while winner is None:
         game.display_board()
         move = game.get_local_move() if game.my_turn() else game.get_remote_move()
         game.make_move(move)
-        game.update_game_state()
         winner = game.winner()
 
     game.display_board()
     names = {'X':game.X_name, 'O':game.O_name, '=':'The cat'}
     print(f"{names[winner]} wins!")
 
-    # clash.put(game.game_name, '') # cleanup
+    clash.put(game.game_name, '') # cleanup
 
 #---------------------------------------------------------------
 if __name__ == '__main__':
