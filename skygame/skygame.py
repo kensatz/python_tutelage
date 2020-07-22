@@ -58,59 +58,40 @@ class ClashLobby:
 
 #---------------------------------------------------------------
 class C4_game:
-    def __init__(self, clash, game_name, playerX, playerO):
-        self.clash, self.game_name, self.playerX, self.playerO = clash, game_name, playerX, playerO
+    def __init__(self, clash, my_name, op_name, i_start):
+        self.clash, self.my_name, self.op_name = clash, my_name, op_name 
+        
+        self.my_phase = 0 if i_start else 1
+        self.X_name = my_name if i_start else op_name
+        self.O_name = op_name if i_start else my_name
+        self.game_name = f'C4_{self.X_name}_{self.O_name}'
         self.board = [[' '] * 6 for _ in range(7)]
         self.ply = 0
-        if playerX.ilk == 'local':
-            self.clash.put(self.game_name, self.__repr__())
+        if self.my_turn():
+            self.update_game_state()
 
-    def get_checker(self, column, rank):
-        return self.board[column][rank] if column in range(7) and rank in range(6) else None
+    def __str__(self):
+        return 'TBD'
 
-    def make_move(self, column):
-        assert column in range(7)
-        assert ' ' in self.board[column]
-        rank = self.board[column].index(' ')
-        exes_turn = self.ply % 2 == 0
-        checker = 'X' if exes_turn else 'O'
-        self.board[column][rank] = checker
-        self.ply += 1
+    def __repr__(self):
+        col_strs = [f"[{','.join(map(repr, column))}]" for column in self.board]
+        return f"{self.ply}:[{','.join(col_strs)}]"
 
-    def update_game_state(self):
-        exes_turn = self.ply % 2 == 0
-        current_player = self.playerX if exes_turn else self.playerO
-        if current_player.ilk == 'local':
-            self.display_board()
-        self.clash.put(self.game_name, self.__repr__())
+    def unpack(self, repr):
+        parts = repr.split(':')
+        assert len(parts) == 2
+        ply = eval(parts[0])
+        board = eval(parts[1])
+        return ply, board
 
-    def winner(self):
-        # possible return values are:
-        #     'X'
-        #     'O'
-        #     '='  (tie game)
-        #     None (game incomplete)
-                
-        # check for wins
-        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        for dc, dr in directions:
-            for c0 in range(7):
-                for r0 in range(6):
-                    line = [self.get_checker(c0 + i*dc, r0 + i*dr) for i in range(4)]
-                    for color in ('X', 'O'):
-                        if all(checker == color for checker in line):
-                            return color
-
-        # check for tie
-        if self.ply == 6*7:
-            return '='  # tie game
-        
-        # otherwise, game is incomplete
-        return None
+    def my_turn(self):
+        return self.ply % 2 == self.my_phase
 
     def display_board(self):
+        heading = f'{self.X_name} vs {self.O_name}'
         print()
-        print('    +---------------------+')
+        print(f"    {heading:^23}")
+        print(f'    +---------------------+')
         for rank in range(5, -1, -1):
             print(f'    |', end = '')
             for column in range(7):
@@ -120,107 +101,84 @@ class C4_game:
         print('      1  2  3  4  5  6  7 ')
         print()
 
-    def __repr__(self):
-        col_strs = []
-        for column in self.board:
-            col_strs.append(f"[{','.join(map(repr, column))}]")
-        return f"{self.ply}:[{','.join(col_strs)}]"
-
-    def __str__(self):
-        pass
-
-#---------------------------------------------------------------
-class C4_player:
-    def __init__(self, name, color, ilk, clash, game_name):
-        assert color in ('X', 'O')
-        assert ilk in ('local', 'remote')
-        self.name, self.color, self.ilk = name, color, ilk 
-        self.clash, self.game_name = clash, game_name 
-        print(f'name = {name}, color = {color}, ilk = {ilk}, game_name = {game_name}')
-
-    def is_my_turn(self, ply):
-        my_ply = 0 if self.color == 'X' else 1
-        return my_ply == ply
-
-    def get_move(self, board):
-        return self.get_local_move() if self.ilk == 'local' else self.get_remote_move(board)
+    def get_checker(self, column, rank):
+        return self.board[column][rank] if column in range(7) and rank in range(6) else None
 
     def get_local_move(self):
         column = -1
         while column not in range(7):
-            one_thru_seven = input(f'Drop your checker into which column, {self.name}? ')
+            one_thru_seven = input(f'Drop your checker into which column, {self.my_name}? ')
             column = int(one_thru_seven) - 1
         return column
 
-    def unpack(self, repr):
-        parts = repr.split(':')
-        assert len(parts) == 2
-        ply = eval(parts[0])
-        board = eval(parts[1])
-        return ply, board
+    def get_remote_move(self):
+        # wait my turn
+        while True:
+            new_ply, new_board = self.unpack(self.clash.get(self.game_name))
+            if new_ply % 2 == self.my_phase:
+                break
+            sleep(0.5)  # limit request frequency
 
-    def get_remote_move(self, old_board):
-        ply, board = self.unpack(self.clash.get(self.game_name))
-        while not self.is_my_turn(ply):
-            ply, board = self.unpack(self.clash.get(self.game_name))
-            sleep(0.5)
-        comparisons = [board[i] == old_board[i] for i in range(7)]
-        assert not all(comparisons)
-        return comparisons.index(False) 
+        # see which column changed and return its index
+        changed_column_mask = [new_board[col] != self.board[col] for col in range(7)]
+        assert sum(changed_column_mask) == 1
+        return changed_column_mask.index(True) 
 
-#---------------------------------------------------------------
+    def make_move(self, column):
+        assert column in range(7)
+        assert ' ' in self.board[column]
+        rank = self.board[column].index(' ')
+        exes_turn = self.ply % 2 == 0
+        checker = 'X' if exes_turn else 'O'
+        was_my_turn = self.my_turn()
+        self.board[column][rank] = checker
+        self.ply += 1   # changes turn
+        if was_my_turn:
+            self.update_game_state()
+
+    def update_game_state(self):
+        self.clash.put(self.game_name, self.__repr__())
+
+    def winner(self):
+        # check for wins
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dc, dr in directions:
+            for c0 in range(7):
+                for r0 in range(6):
+                    quad = [self.get_checker(c0 + i*dc, r0 + i*dr) for i in range(4)]
+                    for color in ('X', 'O'):
+                        if all(checker == color for checker in quad):
+                            return color
+        # check for tie
+        if self.ply == 6*7:
+            return '='  # tie game
+
+        # otherwise, game is incomplete
+        return None
+
 def main():
-    clash = Clash("http://key-value-pairs.appspot.com")
-
-    # lobby = ClashLobby(clash, "lobby")
-
-    # my_name = input("What's your name? ")
-    # lobby.exit(my_name)
-    # print(f"Lobby contains: {lobby.lobbyists()}")
-
-    # input("press Enter to enter the lobby ")
-    # lobby.enter(my_name)
-    # print("Your are now in the lobby")
-    # print(f"Lobby contains: {lobby.lobbyists()}")
-
     my_name = input("What's your name? ")
-    op_name = input("What is your opponent's name? ")
-    op_ilk = input("What is your opponent's ilk (local or remote)? ")
-    assert op_ilk in ('local', 'remote')
-
-    if my_name == 'Ken':
-        X_name, X_ilk = my_name, 'local'
-        O_name, O_ilk = op_name, op_ilk
-    else:
-        X_name, X_ilk = op_name, op_ilk
-        O_name, O_ilk = my_name, 'local'
-
-    game_name = f'C4_{X_name}_{O_name}'
+    op_name = input("What's your opponent's name? ")
+    reply = input("Are you the starting player? ")
+    i_start = reply[0].lower() == 'y'
         
-    player_X = C4_player(X_name, 'X', X_ilk, clash, game_name)
-    player_O = C4_player(O_name, 'O', O_ilk, clash, game_name)
+    clash = Clash("http://key-value-pairs.appspot.com")
+    game = C4_game(clash, my_name, op_name, i_start)
 
-    game = C4_game(clash, game_name, player_X, player_O)
-
-    game.display_board()
     winner = None
     while winner == None:
-        exes_turn = game.ply % 2 == 0
-        current_player = player_X if exes_turn else player_O
-        move = current_player.get_move(game.board)
+        game.display_board()
+        if game.my_turn():
+            move = game.get_local_move() 
+        else:
+            move = game.get_remote_move()
         game.make_move(move)
         game.update_game_state()
         winner = game.winner()
 
-    winner = game.winner()
-    if winner in {'X', 'O'}:
-        print(f'{winner} wins the game.')
-    elif winner == '=':
-        print(f'Tie game!')
-    else:
-        print(f"something's wrong... game.winner() returned {winner}.")
-    print()
-
+    game.display_board()
+    names = {'X':game.X_name, 'O':game.O_name, '=':'The cat'}
+    print(f"{names[winner]} wins!")
 
 #---------------------------------------------------------------
 if __name__ == '__main__':
