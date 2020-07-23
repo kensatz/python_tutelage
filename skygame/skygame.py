@@ -4,7 +4,27 @@ import sys
 import time
 from time import sleep
 from threading import Thread
+
+#---------------------------------------------------------------
+class FunctionThread(Thread):
+    def __init__(self, *args, **kwargs):
+        self.saved_target = kwargs.get('target')
+        self.saved_args = kwargs.get('args')
+        self.saved_kwargs = kwargs.get('kwargs')
+
+        super().__init__(*args, **kwargs)
+        self._return = None
+
+    def run(self):
+        args = self.saved_args or []
+        kwargs = self.saved_kwargs or {}
+        if self.saved_target:
+            self._return = self.saved_target(*args, **kwargs)
     
+    def join(self, *args, **kwargs):
+        super().join(*args, **kwargs)
+        return self._return
+
 #---------------------------------------------------------------
 class Clash:
     def __init__(self, url):
@@ -20,8 +40,20 @@ class Clash:
         assert response.status_code == 200
 
     def wait_for_change(self, key, old_value=None):
-        pass
-        # return thread
+        def waiter():
+            while True:
+                current_value = self.get(key)
+                if current_value != old_value:
+                    break
+                sleep(0.5)
+            return current_value
+
+        if old_value is None:
+            old_value = self.get(key)
+
+        wait_thread = FunctionThread(target=waiter)
+        wait_thread.start()
+        return wait_thread
 
 #---------------------------------------------------------------
 class ClashLobby:
@@ -111,10 +143,12 @@ class C4_game:
     def get_remote_move(self):
         # wait my turn
         while True:
-            new_ply, new_board = eval(self.clash.get(self.game_name))
+            # wait for a change in the game state
+            state = self.clash.wait_for_change(self.game_name).join()
+            # make sure its our turn
+            new_ply, new_board = eval(state)
             if new_ply % 2 == self.my_phase:
                 break
-            sleep(0.5)  # limit request frequency
 
         # see which column changed and return its index
         changed_column_mask = [new_board[col] != self.board[col] for col in range(7)]
@@ -154,12 +188,21 @@ class C4_game:
         return None
 
 def main():
+    clash = Clash("http://key-value-pairs.appspot.com")\
+    
+    # w = clash.wait_for_change('some_key').join()
+    # print("waiting for a change...")
+    # result = w.join()
+    # print("done waiting")
+    # print(f'result is {repr(result)}')
+    # import sys
+    # sys.exit()
+
     my_name = input("What's your name? ")
     op_name = input("What's your opponent's name? ")
     reply = input("Are you the starting player? ")
     i_start = reply[0].lower() == 'y'
         
-    clash = Clash("http://key-value-pairs.appspot.com")
     game = C4_game(clash, my_name, op_name, i_start)
     
     winner = None
