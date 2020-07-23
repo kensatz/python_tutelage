@@ -19,6 +19,10 @@ class Clash:
         response = requests.get(f'{self.url}/?{key}={val}')
         assert response.status_code == 200
 
+    def wait_for_change(self, key, old_value=None):
+        pass
+        # return thread
+
 #---------------------------------------------------------------
 class ClashLobby:
     def __init__(self, clash, lobby_key):
@@ -75,15 +79,7 @@ class C4_game:
 
     def __repr__(self):
         col_strs = [f"[{','.join(map(repr, column))}]" for column in self.board]
-        return f"{self.ply}:[{','.join(col_strs)}]"
-
-    def unpack(self, repr):
-        parts = repr.split(':')
-        assert len(parts) == 2
-        ply = eval(parts[0])
-        board = eval(parts[1])
-        return ply, board
-
+        return f"({self.ply},[{','.join(col_strs)}])"
 
     def my_turn(self):
         return self.ply % 2 == self.my_phase
@@ -115,7 +111,7 @@ class C4_game:
     def get_remote_move(self):
         # wait my turn
         while True:
-            new_ply, new_board = self.unpack(self.clash.get(self.game_name))
+            new_ply, new_board = eval(self.clash.get(self.game_name))
             if new_ply % 2 == self.my_phase:
                 break
             sleep(0.5)  # limit request frequency
@@ -165,11 +161,14 @@ def main():
         
     clash = Clash("http://key-value-pairs.appspot.com")
     game = C4_game(clash, my_name, op_name, i_start)
-
+    
     winner = None
     while winner is None:
         game.display_board()
-        move = game.get_local_move() if game.my_turn() else game.get_remote_move()
+        if game.my_turn():
+            move = game.get_local_move() 
+        else:
+            move = game.get_remote_move()
         game.make_move(move)
         winner = game.winner()
 
