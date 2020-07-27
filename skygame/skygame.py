@@ -103,6 +103,7 @@ class C4_game:
         self.game_name = f'C4_{self.X_name}_{self.O_name}'
         self.board = [[' '] * 6 for _ in range(7)]
         self.ply = 0
+        self.last_move = None
         if self.my_turn():
             self.update_game_state()
 
@@ -116,8 +117,8 @@ class C4_game:
     def my_turn(self):
         return self.ply % 2 == self.my_phase
 
-    def display_board(self):
-        heading = f'{self.X_name} vs {self.O_name}'
+    def display_board(self, prev_col=None):
+        heading = f'{self.X_name} (X) vs {self.O_name} (O)'
         print()
         print(f"    {heading:^23}")
         print(f'    +---------------------+')
@@ -127,7 +128,10 @@ class C4_game:
                 print(f' {self.get_checker(column, rank)} ', end = '')
             print('|')
         print('    +---------------------+')
-        print('      1  2  3  4  5  6  7 ')
+        # print('      1  2  3  4  5  6  7 ')
+        print('     ', end = '')
+        for col in range(1, 8):
+            print(f'{col:^3}' if col != prev_col else f'[{col}]', end ='')
         print()
 
     def get_checker(self, column, rank):
@@ -153,12 +157,15 @@ class C4_game:
         # see which column changed and return its index
         changed_column_mask = [new_board[col] != self.board[col] for col in range(7)]
         assert sum(changed_column_mask) == 1
-        return changed_column_mask.index(True) 
+        column = changed_column_mask.index(True) 
+        return column
 
     def make_move(self, column):
         assert column in range(7)
         assert ' ' in self.board[column]
         rank = self.board[column].index(' ')
+        self.last_move = column
+
         exes_turn = self.ply % 2 == 0
         checker = 'X' if exes_turn else 'O'
         was_my_turn = self.my_turn()
@@ -202,20 +209,20 @@ def main():
     op_name = input("What's your opponent's name? ")
     reply = input("Are you the starting player? ")
     i_start = reply[0].lower() == 'y'
-        
+    
     game = C4_game(clash, my_name, op_name, i_start)
     
     winner = None
     while winner is None:
-        game.display_board()
+        game.display_board(game.last_move)
         if game.my_turn():
             move = game.get_local_move() 
         else:
             move = game.get_remote_move()
         game.make_move(move)
         winner = game.winner()
-
-    game.display_board()
+    
+    game.display_board(game.last_move)
     names = {'X':game.X_name, 'O':game.O_name, '=':'The cat'}
     print(f"{names[winner]} wins!")
 
