@@ -194,6 +194,7 @@ class C4_game:
                             return color 
         # check for tie
         if self.ply == 6*7:
+            self.highlights = []
             return '='  # tie game
 
         # otherwise, game is incomplete
