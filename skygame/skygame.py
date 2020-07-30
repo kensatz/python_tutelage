@@ -103,7 +103,7 @@ class C4_game:
         self.game_name = f'C4_{self.X_name}_{self.O_name}'
         self.board = [[' '] * 6 for _ in range(7)]
         self.ply = 0
-        self.last_move = None
+        self.highlights = []
         if self.my_turn():
             self.update_game_state()
 
@@ -117,22 +117,25 @@ class C4_game:
     def my_turn(self):
         return self.ply % 2 == self.my_phase
 
-    def display_board(self, prev_col=None):
+    def display_board(self):
+        indent = ' ' * (4 if self.my_turn() else 34)
         heading = f'{self.X_name} (X) vs {self.O_name} (O)'
+        vertical, horizontal, corner = '|', '---', '+'
         print()
-        print(f"    {heading:^23}")
-        print(f'    +---------------------+')
-        for rank in range(5, -1, -1):
-            print(f'    |', end = '')
+        print(indent + f'{heading:^23}')
+        print(indent + corner + horizontal * 7 + corner)
+        for r in range(6):
+            rank = 5 - r
+            print(indent + vertical, end = '')
             for column in range(7):
-                print(f' {self.get_checker(column, rank)} ', end = '')
-            print('|')
-        print('    +---------------------+')
-        # print('      1  2  3  4  5  6  7 ')
-        print('     ', end = '')
-        for col in range(1, 8):
-            print(f'{col:^3}' if col != prev_col else f'[{col}]', end ='')
-        print()
+                checker = self.get_checker(column, rank)
+                if (column, rank) in self.highlights:
+                    print(f'({checker})', end = '')
+                else:
+                    print(f' {checker} ', end = '')
+            print(vertical)
+        print(indent + corner + horizontal * 7 + corner)
+        print(indent + '  1  2  3  4  5  6  7 ')
 
     def get_checker(self, column, rank):
         return self.board[column][rank] if column in range(7) and rank in range(6) else None
@@ -164,7 +167,7 @@ class C4_game:
         assert column in range(7)
         assert ' ' in self.board[column]
         rank = self.board[column].index(' ')
-        self.last_move = column
+        self.highlights = [(column, rank)]
 
         exes_turn = self.ply % 2 == 0
         checker = 'X' if exes_turn else 'O'
@@ -183,10 +186,12 @@ class C4_game:
         for dc, dr in directions:
             for c0 in range(7):
                 for r0 in range(6):
-                    quad = [self.get_checker(c0 + i*dc, r0 + i*dr) for i in range(4)]
+                    places = [(c0 + i*dc, r0 + i*dr) for i in range(4)]
+                    quad = [self.get_checker(*place) for place in places]
                     for color in ('X', 'O'):
                         if all(checker == color for checker in quad):
-                            return color
+                            self.highlights = places
+                            return color 
         # check for tie
         if self.ply == 6*7:
             return '='  # tie game
@@ -214,19 +219,20 @@ def main():
     
     winner = None
     while winner is None:
-        game.display_board(game.last_move)
+        game.display_board()
         if game.my_turn():
             move = game.get_local_move() 
         else:
             move = game.get_remote_move()
         game.make_move(move)
         winner = game.winner()
-    
-    game.display_board(game.last_move)
+
+    game.display_board()
     names = {'X':game.X_name, 'O':game.O_name, '=':'The cat'}
     print(f"{names[winner]} wins!")
 
-    clash.put(game.game_name, '') # cleanup
+    if game.my_turn():
+        clash.put(game.game_name, '') # cleanup
 
 #---------------------------------------------------------------
 if __name__ == '__main__':
